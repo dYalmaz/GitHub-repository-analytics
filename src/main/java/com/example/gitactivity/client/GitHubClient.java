@@ -1,6 +1,7 @@
 package com.example.gitactivity.client;
 
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
+import com.example.gitactivity.exception.RepositoryNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -20,6 +21,14 @@ public class GitHubClient {
         return restClient.get()
                 .uri("/repos/{owner}/{repo}", owner, repo)
                 .retrieve()
+                .onStatus(
+                        status -> status.value() == 404,
+                        (request, response) -> {
+                            throw new RepositoryNotFoundException(
+                                    "Repository not found: " + owner + "/" + repo
+                            );
+                        }
+                )
                 .body(GitHubRepositoryResponse.class);
     }
 }
