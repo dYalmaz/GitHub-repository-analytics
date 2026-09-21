@@ -5,11 +5,11 @@ import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import org.springframework.stereotype.Service;
 
 @Service
-public class GitService {
+public class RepositoryService {
 
     private final GitHubClient gitClient;
 
-    public GitService(GitHubClient gitClient) {
+    public RepositoryService(GitHubClient gitClient) {
         this.gitClient = gitClient;
     }
 
