@@ -16,4 +16,23 @@ public class GlobalExceptionHandler {
             .status(HttpStatus.NOT_FOUND)
             .body(exception.getMessage());
   }
+
+  @ExceptionHandler(GitHubRateLimitException.class)
+  public ResponseEntity<String> handleGitHubRateLimitException(
+          GitHubRateLimitException exception) {
+
+      return ResponseEntity
+              .status(HttpStatus.TOO_MANY_REQUESTS)
+              .body(exception.getMessage());
+  }
+
+  @ExceptionHandler(GitHubServiceException.class)
+  public ResponseEntity<String> handleGitHubServiceException(
+          GitHubServiceException exception) {
+
+      return ResponseEntity
+              .status(HttpStatus.BAD_GATEWAY)
+              .body(exception.getMessage());
+  }
+
 }

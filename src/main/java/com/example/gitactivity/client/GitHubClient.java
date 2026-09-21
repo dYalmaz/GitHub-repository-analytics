@@ -1,6 +1,8 @@
 package com.example.gitactivity.client;
 
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
+import com.example.gitactivity.exception.GitHubRateLimitException;
+import com.example.gitactivity.exception.GitHubServiceException;
 import com.example.gitactivity.exception.RepositoryNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -26,6 +28,28 @@ public class GitHubClient {
                         (request, response) -> {
                             throw new RepositoryNotFoundException(
                                     "Repository not found: " + owner + "/" + repo
+                            );
+                        }
+                )
+                .onStatus(
+                        status -> status.value() == 403,
+                        (request, response) -> {
+
+                            String remaining =
+                                    response.getHeaders().getFirst("X-RateLimit-Remaining");
+
+                            if ("0".equals(remaining)) {
+                                throw new GitHubRateLimitException(
+                                        "GitHub rate limit exceeded"
+                                );
+                            }
+                        }
+                )
+                .onStatus(
+                        status -> status.is5xxServerError(),
+                        (request, response) -> {
+                            throw new GitHubServiceException(
+                                    "GitHub service is currently unavailable"
                             );
                         }
                 )
