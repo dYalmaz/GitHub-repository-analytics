@@ -1,6 +1,9 @@
 package com.example.gitactivity.client;
 
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
+import com.example.gitactivity.exception.GitHubRateLimitException;
+import com.example.gitactivity.exception.GitHubServiceException;
+import com.example.gitactivity.exception.RepositoryNotFoundException;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import okhttp3.Headers;
@@ -12,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class GitHubClientTest {
 
@@ -69,8 +73,60 @@ public class GitHubClientTest {
         assertEquals("/repos/spring-projects/spring-boot", request.getTarget().toString());
     }
 
+    @Test
+    void shouldThrowRepositoryNotFoundException() throws Exception {
 
+        mockWebServer.enqueue(
+                new MockResponse(
+                        404,
+                        new Headers.Builder().build(),
+                        ""
+                )
+        );
 
+        assertThrows(
+                RepositoryNotFoundException.class,
+                () -> gitHubClient.getRepository("spring-projects", "non-existent")
+        );
 
+    }
+
+    @Test
+    void shouldThrowGitHubRateLimitException() throws Exception {
+
+        mockWebServer.enqueue(
+                new MockResponse(
+                        403,
+                        new Headers.Builder()
+                                .add("X-RateLimit-Remaining", "0")
+                                .build(),
+                        ""
+                )
+        );
+
+        assertThrows(
+                GitHubRateLimitException.class,
+                () -> gitHubClient.getRepository("spring-projects", "spring-boot")
+        );
+
+    }
+
+    @Test
+    void shouldThrowGitHubServiceException() throws Exception {
+
+        mockWebServer.enqueue(
+                new MockResponse(
+                        500,
+                        new Headers.Builder().build(),
+                        ""
+                )
+        );
+
+        assertThrows(
+                GitHubServiceException.class,
+                () -> gitHubClient.getRepository("spring-projects", "spring-boot")
+        );
+
+    }
 
 }
