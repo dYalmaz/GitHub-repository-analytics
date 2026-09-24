@@ -16,4 +16,11 @@ public class RepositoryCacheKeyTest {
 
     }
 
+    @Test
+    void shouldUseTenMinuteCacheTtl(){
+
+        assertThat(RepositoryCacheKey.TTL_MINUTES).isEqualTo(10);
+
+    }
+
 }

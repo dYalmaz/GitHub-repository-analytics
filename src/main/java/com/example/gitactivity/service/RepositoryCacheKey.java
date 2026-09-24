@@ -3,6 +3,7 @@ package com.example.gitactivity.service;
 public class RepositoryCacheKey {
 
     private static final String PREFIX = "repository:";
+    public static final long TTL_MINUTES = 10;
 
     private RepositoryCacheKey() {
         // private constructor to prevent instantiation
