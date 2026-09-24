@@ -9,10 +9,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/repositories")
-public class GitController {
+public class RepositoryController {
     private final RepositoryService repositoryService;
 
-    public GitController(RepositoryService repositoryService) {
+    public RepositoryController(RepositoryService repositoryService) {
         this.repositoryService = repositoryService;
     }
 
