@@ -1,5 +1,6 @@
 package com.example.gitactivity.controller;
 
+import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.exception.GitHubRateLimitException;
 import com.example.gitactivity.exception.GitHubServiceException;
@@ -7,6 +8,8 @@ import com.example.gitactivity.exception.RepositoryNotFoundException;
 import com.example.gitactivity.service.RepositoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -70,7 +73,29 @@ public class RepositoryControllerTest {
 
     }
 
+    @Test
+    void shouldReturnContributors() {
 
+        GitHubContributorResponse contributor= new GitHubContributorResponse();
+
+        contributor.setLogin("spring-projects");
+        contributor.setContributions(100);
+
+        GitHubContributorResponse[] expected = new GitHubContributorResponse[]{contributor};
+
+        when(repositoryService.getContributors(
+                "spring-projects",
+                "spring-boot"
+        )).thenReturn(expected);
+
+        ResponseEntity<GitHubContributorResponse[]> response = repositoryController.getContributors("spring-projects", "spring-boot");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expected, response.getBody());
+
+        verify(repositoryService).getContributors("spring-projects", "spring-boot");
+
+    }
 
 
 }

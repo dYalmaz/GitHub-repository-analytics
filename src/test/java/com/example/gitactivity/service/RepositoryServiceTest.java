@@ -1,6 +1,7 @@
 package com.example.gitactivity.service;
 
 import com.example.gitactivity.client.GitHubClient;
+import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.exception.GitHubRateLimitException;
 import com.example.gitactivity.exception.GitHubServiceException;
@@ -37,14 +38,15 @@ class RepositoryServiceTest {
     @InjectMocks
     private RepositoryService repositoryService;
 
-    @BeforeEach
-    void setUp() {
+    private void setupRedisCache() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get(anyString())).thenReturn(null);
     }
 
     @Test
     void shouldReturnRepositoryFromGitHubClient() {
+
+        setupRedisCache();
 
         GitHubRepositoryResponse repository = new GitHubRepositoryResponse();
 
@@ -60,6 +62,8 @@ class RepositoryServiceTest {
 
     @Test
     void shouldPropagateRepositoryNotFoundException(){
+
+        setupRedisCache();
 
         RepositoryNotFoundException exception = new RepositoryNotFoundException("Repository not found: spring-projects/non-existent");
 
@@ -79,6 +83,8 @@ class RepositoryServiceTest {
     @Test
     void shouldPropagateRateLimitExceededException(){
 
+        setupRedisCache();
+
         GitHubRateLimitException exception = new GitHubRateLimitException("GitHub API rate limit exceeded");
 
         when(gitHubClient.getRepository("spring-projects", "spring-boot")).thenThrow(exception);
@@ -96,6 +102,8 @@ class RepositoryServiceTest {
     @Test
     void shouldPropagateServiceUnavailableException(){
 
+        setupRedisCache();
+
         GitHubServiceException exception = new GitHubServiceException("GitHub API service unavailable");
 
         when(gitHubClient.getRepository("spring-projects", "spring-boot")).thenThrow(exception);
@@ -112,6 +120,8 @@ class RepositoryServiceTest {
 
     @Test
     void shouldFetchFromGitHubAndCacheResponse(){
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         String owner="spring-projects";
         String repo="spring-boot";
@@ -139,6 +149,8 @@ class RepositoryServiceTest {
     @Test
     void shouldReturnCachedResponseWithoutCallingGitHub(){
 
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
         String owner="spring-projects";
         String repo="spring-boot";
 
@@ -156,13 +168,13 @@ class RepositoryServiceTest {
 
     @Test
     void shouldCallGitHubOnCacheMiss(){
+        setupRedisCache();
 
         String owner="spring-projects";
         String repo="spring-boot";
 
         GitHubRepositoryResponse response = new GitHubRepositoryResponse();
 
-        when(valueOperations.get(RepositoryCacheKey.create(owner, repo))).thenReturn(null);
         when(gitHubClient.getRepository(owner, repo)).thenReturn(response);
 
         GitHubRepositoryResponse result = repositoryService.getRepoDetails(owner, repo);
@@ -173,7 +185,116 @@ class RepositoryServiceTest {
 
     }
 
+    @Test
+    void shouldReturnContributorsFromGitHubClient() {
 
+        setupRedisCache();
+
+        GitHubContributorResponse contributor = new GitHubContributorResponse();
+
+        GitHubContributorResponse[] expected = {contributor};
+
+        when(gitHubClient.getContributors("spring-projects", "spring-boot")).thenReturn(expected);
+
+        GitHubContributorResponse[] actual = repositoryService.getContributors("spring-projects", "spring-boot");
+
+        assertSame(expected, actual);
+
+        verify(gitHubClient).getContributors("spring-projects", "spring-boot");
+
+    }
+
+    @Test
+    void shouldCallGitHubOnContributorsCacheMiss() {
+        setupRedisCache();
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubContributorResponse contributor = new GitHubContributorResponse();
+        GitHubContributorResponse[] expected = {contributor};
+
+        when(gitHubClient.getContributors(owner, repo)).thenReturn(expected);
+
+        GitHubContributorResponse[] actual = repositoryService.getContributors(owner, repo);
+
+        assertSame(expected, actual);
+
+        verify(gitHubClient).getContributors(owner, repo);
+    }
+
+    @Test
+    void shouldReturnContributorsFromCache() {
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubContributorResponse contributor = new GitHubContributorResponse();
+
+        GitHubContributorResponse[] cached = {contributor};
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        when(valueOperations.get(ContributorCacheKey.create(owner, repo))).thenReturn(cached);
+
+        GitHubContributorResponse[] actual = repositoryService.getContributors(owner, repo);
+
+        assertSame(cached, actual);
+
+        verify(gitHubClient, never()).getContributors(owner, repo);
+    }
+
+    @Test
+    void shouldStoreContributorsInCacheAfterCacheMiss() {
+
+        setupRedisCache();
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubContributorResponse contributor = new GitHubContributorResponse();
+        GitHubContributorResponse[] expected = {contributor};
+
+        String cacheKey = ContributorCacheKey.create(owner, repo);
+
+        when(gitHubClient.getContributors(owner, repo)).thenReturn(expected);
+
+        repositoryService.getContributors(owner, repo);
+
+        verify(valueOperations).set(
+                cacheKey,
+                expected,
+                ContributorCacheKey.TTL_MINUTES,
+                TimeUnit.MINUTES
+        );
+
+    }
+
+    @Test
+    void shouldStoreContributorsWithCorrectTtl(){
+
+        setupRedisCache();
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubContributorResponse contributor = new GitHubContributorResponse();
+        GitHubContributorResponse[] expected = {contributor};
+
+        String cacheKey = ContributorCacheKey.create(owner, repo);
+
+        when(gitHubClient.getContributors(owner, repo)).thenReturn(expected);
+
+        repositoryService.getContributors(owner, repo);
+
+        verify(valueOperations).set(
+                cacheKey,
+                expected,
+                10,
+                TimeUnit.MINUTES
+        );
+
+    }
 
 
 }

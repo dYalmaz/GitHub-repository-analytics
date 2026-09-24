@@ -1,7 +1,9 @@
 package com.example.gitactivity.controller;
 
+import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.service.RepositoryService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +23,14 @@ public class RepositoryController {
 
         return repositoryService.getRepoDetails(owner, repo);
 
+    }
 
+    @GetMapping("/{owner}/{repo}/contributors")
+    public ResponseEntity<GitHubContributorResponse[]> getContributors(@PathVariable String owner, @PathVariable String repo) {
+
+        GitHubContributorResponse[] contributors = repositoryService.getContributors(owner, repo);
+
+        return ResponseEntity.ok(contributors);
 
     }
 

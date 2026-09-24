@@ -1,6 +1,7 @@
 package com.example.gitactivity.service;
 
 import com.example.gitactivity.client.GitHubClient;
+import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -42,5 +43,28 @@ public class RepositoryService {
 
         return repositoryResponse;
     }
+
+    public GitHubContributorResponse[] getContributors(String owner, String repo) {
+
+        String cacheKey = ContributorCacheKey.create(owner, repo);
+
+        GitHubContributorResponse[] cached = (GitHubContributorResponse[]) redisTemplate.opsForValue().get(cacheKey);
+
+        if (cached != null) {
+            return cached;
+        }
+
+        GitHubContributorResponse[] response = gitClient.getContributors(owner, repo);
+
+        redisTemplate.opsForValue().set(
+                cacheKey,
+                response,
+                ContributorCacheKey.TTL_MINUTES,
+                TimeUnit.MINUTES
+        );
+
+        return response;
+    }
+
 
 }
