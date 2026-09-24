@@ -1,11 +1,13 @@
 package com.example.gitactivity.client;
 
+import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.exception.GitHubRateLimitException;
 import com.example.gitactivity.exception.GitHubServiceException;
 import com.example.gitactivity.exception.RepositoryNotFoundException;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
+import mockwebserver3.RecordedRequest;
 import okhttp3.Headers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -128,5 +130,48 @@ public class GitHubClientTest {
         );
 
     }
+
+    @Test
+    void shouldReturnContributors() throws Exception {
+        mockWebServer.enqueue(
+                new MockResponse(
+                        200,
+                        new Headers.Builder()
+                                .add("Content-Type", "application/json")
+                                .build(),
+                        """
+                                [
+                                    {
+                                        "login": "octocat",
+                                        "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+                                        "contributions": 42,
+                                        "html_url": "https://github.com/octocat"
+                                    },
+                                    {
+                                        "login": "test-user",
+                                        "avatar_url": "https://example.com/avatar.png",
+                                        "contributions": 10,
+                                        "html_url": "https://github.com/test-user"
+                                    }
+                                ]
+                                """
+        ));
+
+        GitHubContributorResponse[] result = gitHubClient.getContributors("spring-projects", "spring-boot");
+
+        assertEquals(2, result.length);
+        assertEquals("octocat", result[0].getLogin());
+        assertEquals(42, result[0].getContributions());
+        assertEquals("https://github.com/octocat", result[0].getHtmlUrl());
+
+        assertEquals("test-user", result[1].getLogin());
+        assertEquals(10, result[1].getContributions());
+
+        RecordedRequest request = mockWebServer.takeRequest();
+
+        assertEquals("/repos/spring-projects/spring-boot/contributors", request.getTarget().toString());
+
+    }
+
 
 }

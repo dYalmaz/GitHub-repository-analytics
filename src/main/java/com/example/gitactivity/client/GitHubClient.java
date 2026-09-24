@@ -1,5 +1,6 @@
 package com.example.gitactivity.client;
 
+import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.exception.GitHubRateLimitException;
 import com.example.gitactivity.exception.GitHubServiceException;
@@ -55,4 +56,16 @@ public class GitHubClient {
                 )
                 .body(GitHubRepositoryResponse.class);
     }
+
+    public GitHubContributorResponse[] getContributors(
+            String owner,
+            String repo) {
+
+        return restClient.get()
+                .uri("/repos/{owner}/{repo}/contributors", owner, repo)
+                .retrieve()
+                .body(GitHubContributorResponse[].class);
+    }
+
+
 }
