@@ -1,5 +1,6 @@
 package com.example.gitactivity.controller;
 
+import com.example.gitactivity.dto.CacheStatsResponse;
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
@@ -118,6 +119,24 @@ public class RepositoryControllerTest {
         assertSame(expected, response.getBody());
 
         verify(repositoryService).getRepositoryAnalytics(owner, repo);
+
+    }
+
+    @Test
+    void shouldReturnCacheStats() {
+
+        CacheStatsResponse expected = new CacheStatsResponse();
+        expected.setHits(10);
+        expected.setMisses(5);
+
+        when(repositoryService.getCacheStats()).thenReturn(expected);
+
+        ResponseEntity<CacheStatsResponse> response = repositoryController.getCacheStats();
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertSame(expected, response.getBody());
+
+        verify(repositoryService).getCacheStats();
 
     }
 

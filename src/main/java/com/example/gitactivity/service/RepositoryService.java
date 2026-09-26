@@ -1,6 +1,7 @@
 package com.example.gitactivity.service;
 
 import com.example.gitactivity.client.GitHubClient;
+import com.example.gitactivity.dto.CacheStatsResponse;
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
@@ -8,12 +9,16 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class RepositoryService {
 
     private final GitHubClient gitClient;
     private final RedisTemplate<String, Object> redisTemplate;
+    private AtomicLong cacheHits = new AtomicLong(0);
+    private AtomicLong cacheMisses = new AtomicLong(0);
+
 
     public RepositoryService(GitHubClient gitClient, RedisTemplate<String, Object> redisTemplate) {
         this.gitClient = gitClient;
@@ -28,8 +33,11 @@ public class RepositoryService {
         Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
 
         if (cachedValue != null) {
+            cacheHits.incrementAndGet();
             return (GitHubRepositoryResponse) cachedValue;
         }
+
+        cacheMisses.incrementAndGet();
 
         GitHubRepositoryResponse repositoryResponse = gitClient.getRepository(owner, repo);
 
@@ -50,8 +58,11 @@ public class RepositoryService {
         GitHubContributorResponse[] cached = (GitHubContributorResponse[]) redisTemplate.opsForValue().get(cacheKey);
 
         if (cached != null) {
+            cacheHits.incrementAndGet();
             return cached;
         }
+
+        cacheMisses.incrementAndGet();
 
         GitHubContributorResponse[] response = gitClient.getContributors(owner, repo);
 
@@ -81,6 +92,17 @@ public class RepositoryService {
         return analytics;
 
     }
+
+    public CacheStatsResponse getCacheStats() {
+
+        CacheStatsResponse cacheStats = new CacheStatsResponse();
+        cacheStats.setHits(cacheHits.get());
+        cacheStats.setMisses(cacheMisses.get());
+
+        return cacheStats;
+    }
+
+
 
 
 }

@@ -1,5 +1,6 @@
 package com.example.gitactivity.controller;
 
+import com.example.gitactivity.dto.CacheStatsResponse;
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
@@ -39,6 +40,12 @@ public class RepositoryController {
     public ResponseEntity<RepositoryAnalyticsResponse> getRepositoryAnalytics(@PathVariable String owner, @PathVariable String repo){
         RepositoryAnalyticsResponse analytics = repositoryService.getRepositoryAnalytics(owner, repo);
         return ResponseEntity.ok(analytics);
+    }
+
+    @GetMapping("/cache/stats")
+    public ResponseEntity<CacheStatsResponse> getCacheStats() {
+        CacheStatsResponse stats = repositoryService.getCacheStats();
+        return ResponseEntity.ok(stats);
     }
 
 }

@@ -1,6 +1,7 @@
 package com.example.gitactivity.service;
 
 import com.example.gitactivity.client.GitHubClient;
+import com.example.gitactivity.dto.CacheStatsResponse;
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
@@ -405,6 +406,94 @@ class RepositoryServiceTest {
         );
 
     }
+
+    @Test
+    void shouldReturnCacheStats() {
+
+        // Generate one cache hit
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        GitHubRepositoryResponse cachedRepository =
+                new GitHubRepositoryResponse();
+
+        when(valueOperations.get(
+                RepositoryCacheKey.create("spring-projects", "spring-boot")
+        )).thenReturn(cachedRepository);
+
+        repositoryService.getRepoDetails(
+                "spring-projects",
+                "spring-boot"
+        );
+
+        // Generate one cache miss
+        when(valueOperations.get(
+                RepositoryCacheKey.create("test-owner", "test-repo")
+        )).thenReturn(null);
+
+        GitHubRepositoryResponse repository =
+                new GitHubRepositoryResponse();
+
+        when(gitHubClient.getRepository("test-owner", "test-repo"))
+                .thenReturn(repository);
+
+        repositoryService.getRepoDetails(
+                "test-owner",
+                "test-repo"
+        );
+
+        CacheStatsResponse stats =
+                repositoryService.getCacheStats();
+
+        assertEquals(1, stats.getHits());
+        assertEquals(1, stats.getMisses());
+    }
+
+    @Test
+    void shouldTrackContributorCacheStats() {
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubContributorResponse contributor =
+                new GitHubContributorResponse();
+
+        GitHubContributorResponse[] contributors = {contributor};
+
+        // Cache miss
+        when(valueOperations.get(
+                ContributorCacheKey.create(owner, repo)
+        )).thenReturn(null);
+
+        when(gitHubClient.getContributors(owner, repo))
+                .thenReturn(contributors);
+
+        repositoryService.getContributors(owner, repo);
+
+        // Cache hit
+        when(valueOperations.get(
+                ContributorCacheKey.create(owner, repo)
+        )).thenReturn(contributors);
+
+        repositoryService.getContributors(owner, repo);
+
+        CacheStatsResponse stats =
+                repositoryService.getCacheStats();
+
+        assertEquals(1, stats.getHits());
+        assertEquals(1, stats.getMisses());
+    }
+
+    @Test
+    void shouldReturnZeroCacheStatsInitially() {
+
+        CacheStatsResponse stats = repositoryService.getCacheStats();
+
+        assertEquals(0, stats.getHits());
+        assertEquals(0, stats.getMisses());
+    }
+
 
 }
 
