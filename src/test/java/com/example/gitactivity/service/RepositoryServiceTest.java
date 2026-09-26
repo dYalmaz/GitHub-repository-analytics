@@ -129,12 +129,14 @@ class RepositoryServiceTest {
 
         GitHubRepositoryResponse response = new GitHubRepositoryResponse();
 
-        when(valueOperations.get(anyString())).thenReturn(null);
+        when(valueOperations.get(RepositoryCacheKey.create(owner, repo))).thenReturn(null);
         when(gitHubClient.getRepository(owner, repo)).thenReturn(response);
 
         GitHubRepositoryResponse result = repositoryService.getRepoDetails(owner, repo);
 
         assertSame(response, result);
+
+        verify(valueOperations).get(RepositoryCacheKey.create(owner, repo));
 
         verify(gitHubClient).getRepository(owner, repo);
 
@@ -162,6 +164,8 @@ class RepositoryServiceTest {
         GitHubRepositoryResponse result = repositoryService.getRepoDetails(owner, repo);
 
         assertSame(cachedResponse, result);
+
+        verify(valueOperations).get(RepositoryCacheKey.create(owner, repo));
 
         verify(gitHubClient, never()).getRepository(owner, repo);
 
@@ -291,11 +295,44 @@ class RepositoryServiceTest {
         verify(valueOperations).set(
                 cacheKey,
                 expected,
-                10,
+                ContributorCacheKey.TTL_MINUTES,
                 TimeUnit.MINUTES
         );
 
     }
+
+    @Test
+    void ShouldFetchFromGitHubWhenCachedRepositoryHasExpired(){
+
+        String owner="spring-projects";
+        String repo="spring-boot";
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        GitHubRepositoryResponse response = new GitHubRepositoryResponse();
+
+        when(valueOperations.get(RepositoryCacheKey.create(owner, repo))).thenReturn(null);
+
+        when(gitHubClient.getRepository(owner, repo)).thenReturn(response);
+
+        GitHubRepositoryResponse result = repositoryService.getRepoDetails(owner, repo);
+
+        assertSame(response, result);
+
+        verify(valueOperations).get(RepositoryCacheKey.create(owner, repo));
+
+        verify(gitHubClient).getRepository(owner, repo);
+
+        verify(valueOperations).set(
+                eq(RepositoryCacheKey.create(owner, repo)),
+                eq(response),
+                eq(RepositoryCacheKey.TTL_MINUTES),
+                eq(TimeUnit.MINUTES)
+        );
+
+
+    }
+
 
     @Test
     void shouldCalculateRepositoryAnalytics(){
