@@ -70,8 +70,13 @@ public class GitHubClientTest {
         GitHubRepositoryResponse result = gitHubClient.getRepository("spring-projects", "spring-boot");
 
         assertEquals("spring-boot", result.getName());
+        assertEquals("Spring Boot", result.getDescription());
+        assertEquals(100, result.getStars());
+        assertEquals(50, result.getForks());
+        assertEquals("Java", result.getLanguage());
 
         var request = mockWebServer.takeRequest();
+        assertEquals("GET", request.getMethod());
         assertEquals("/repos/spring-projects/spring-boot", request.getTarget().toString());
     }
 
@@ -168,9 +173,72 @@ public class GitHubClientTest {
         assertEquals(10, result[1].getContributions());
 
         RecordedRequest request = mockWebServer.takeRequest();
+        assertEquals("GET", request.getMethod());
 
         assertEquals("/repos/spring-projects/spring-boot/contributors", request.getTarget().toString());
 
+    }
+
+    @Test
+    void shouldThrowRepositoryNotFoundExceptionForContributors() throws Exception {
+
+        mockWebServer.enqueue(
+                new MockResponse(
+                        404,
+                        new Headers.Builder().build(),
+                        ""
+                )
+        );
+
+        assertThrows(
+                RepositoryNotFoundException.class,
+                () -> gitHubClient.getContributors(
+                        "spring-projects",
+                        "non-existent"
+                )
+        );
+    }
+
+    @Test
+    void shouldThrowGitHubRateLimitExceptionForContributors() throws Exception {
+
+        mockWebServer.enqueue(
+                new MockResponse(
+                        403,
+                        new Headers.Builder()
+                                .add("X-RateLimit-Remaining", "0")
+                                .build(),
+                        ""
+                )
+        );
+
+        assertThrows(
+                GitHubRateLimitException.class,
+                () -> gitHubClient.getContributors(
+                        "spring-projects",
+                        "spring-boot"
+                )
+        );
+    }
+
+    @Test
+    void shouldThrowGitHubServiceExceptionForContributors() throws Exception {
+
+        mockWebServer.enqueue(
+                new MockResponse(
+                        500,
+                        new Headers.Builder().build(),
+                        ""
+                )
+        );
+
+        assertThrows(
+                GitHubServiceException.class,
+                () -> gitHubClient.getContributors(
+                        "spring-projects",
+                        "spring-boot"
+                )
+        );
     }
 
 

@@ -10,6 +10,7 @@ public class RepositoryAnalyticsResponse {
     public String getRepository() {
         return repository;
     }
+
     public void setRepository(String repository) {
         this.repository = repository;
     }
@@ -17,6 +18,7 @@ public class RepositoryAnalyticsResponse {
     public int getStars() {
         return stars;
     }
+
     public void setStars(int stars) {
         this.stars = stars;
     }
@@ -24,6 +26,7 @@ public class RepositoryAnalyticsResponse {
     public int getForks() {
         return forks;
     }
+
     public void setForks(int forks) {
         this.forks = forks;
     }
@@ -31,8 +34,8 @@ public class RepositoryAnalyticsResponse {
     public double getForkToStarRatio() {
         return forkToStarRatio;
     }
+
     public void setForkToStarRatio(double forkToStarRatio) {
         this.forkToStarRatio = forkToStarRatio;
     }
-
 }

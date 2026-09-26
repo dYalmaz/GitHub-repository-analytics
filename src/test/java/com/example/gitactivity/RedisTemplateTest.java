@@ -3,7 +3,9 @@ package com.example.gitactivity;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
@@ -11,7 +13,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 public class RedisTemplateTest {
 
     @Autowired
-    private RedisTemplate<String, Object> redisTemplate;
+    private StringRedisTemplate redisTemplate;
 
     @Test
     void shouldWriteAndReadFromRedis() {
@@ -21,12 +23,32 @@ public class RedisTemplateTest {
 
         redisTemplate.opsForValue().set(key, value);
 
-        Object result = redisTemplate.opsForValue().get(key);
+        String result = redisTemplate.opsForValue().get(key);
 
         assertThat(result).isEqualTo(value);
 
         redisTemplate.delete(key);
 
+    }
+
+    @Test
+    void shouldSetExpirationOnRedisKey() {
+
+        String key = "test:ttl";
+        String value = "expires";
+
+        redisTemplate.opsForValue().set(
+                key,
+                value,
+                10,
+                TimeUnit.SECONDS
+        );
+
+        Long ttl = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+
+        assertThat(ttl).isBetween(1L, 10L);
+
+        redisTemplate.delete(key);
     }
 
 

@@ -1,6 +1,6 @@
 package com.example.gitactivity.service;
 
-public class RepositoryCacheKey {
+public final class RepositoryCacheKey {
 
     private static final String PREFIX = "repository:";
     public static final long TTL_MINUTES = 10;

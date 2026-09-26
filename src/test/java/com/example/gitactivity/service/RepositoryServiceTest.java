@@ -11,13 +11,13 @@ import com.example.gitactivity.exception.RepositoryNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import tools.jackson.databind.ObjectMapper;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -31,17 +31,29 @@ class RepositoryServiceTest {
     private GitHubClient gitHubClient;
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
+    private StringRedisTemplate redisTemplate;
 
     @Mock
-    private ValueOperations<String, Object> valueOperations;
+    private ValueOperations<String, String> valueOperations;
 
-    @InjectMocks
+    private ObjectMapper objectMapper;
     private RepositoryService repositoryService;
+
+    @BeforeEach
+    void setUp() {
+        objectMapper = new ObjectMapper();
+
+        repositoryService = new RepositoryService(
+                gitHubClient,
+                redisTemplate,
+                objectMapper
+        );
+    }
+
+
 
     private void setupRedisCache() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(anyString())).thenReturn(null);
     }
 
     @Test
@@ -142,9 +154,8 @@ class RepositoryServiceTest {
 
         verify(valueOperations).set(
                 eq(RepositoryCacheKey.create(owner, repo)),
-                eq(response),
-                eq(RepositoryCacheKey.TTL_MINUTES),
-                eq(TimeUnit.MINUTES)
+                anyString(),
+                eq(Duration.ofMinutes(RepositoryCacheKey.TTL_MINUTES))
         );
 
     }
@@ -157,13 +168,17 @@ class RepositoryServiceTest {
         String owner="spring-projects";
         String repo="spring-boot";
 
-        GitHubRepositoryResponse cachedResponse = new GitHubRepositoryResponse();
+        String cachedJson =
+                "{\"name\":\"spring-boot\",\"stars\":100,\"forks\":25}";
 
-        when(valueOperations.get(RepositoryCacheKey.create(owner, repo))).thenReturn(cachedResponse);
+        when(valueOperations.get(RepositoryCacheKey.create(owner, repo)))
+                .thenReturn(cachedJson);
 
         GitHubRepositoryResponse result = repositoryService.getRepoDetails(owner, repo);
 
-        assertSame(cachedResponse, result);
+        assertEquals("spring-boot", result.getName());
+        assertEquals(100, result.getStars());
+        assertEquals(25, result.getForks());
 
         verify(valueOperations).get(RepositoryCacheKey.create(owner, repo));
 
@@ -230,21 +245,24 @@ class RepositoryServiceTest {
 
     @Test
     void shouldReturnContributorsFromCache() {
-
         String owner = "spring-projects";
         String repo = "spring-boot";
 
-        GitHubContributorResponse contributor = new GitHubContributorResponse();
-
-        GitHubContributorResponse[] cached = {contributor};
-
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-        when(valueOperations.get(ContributorCacheKey.create(owner, repo))).thenReturn(cached);
+        String cachedJson =
+                "[{\"login\":\"test-user\",\"avatar_url\":\"avatar.png\",\"contributions\":10,\"html_url\":\"github.com/test-user\"}]";
 
-        GitHubContributorResponse[] actual = repositoryService.getContributors(owner, repo);
+        when(valueOperations.get(
+                ContributorCacheKey.create(owner, repo)
+        )).thenReturn(cachedJson);
 
-        assertSame(cached, actual);
+        GitHubContributorResponse[] actual =
+                repositoryService.getContributors(owner, repo);
+
+        assertEquals(1, actual.length);
+        assertEquals("test-user", actual[0].getLogin());
+        assertEquals(10, actual[0].getContributions());
 
         verify(gitHubClient, never()).getContributors(owner, repo);
     }
@@ -267,36 +285,9 @@ class RepositoryServiceTest {
         repositoryService.getContributors(owner, repo);
 
         verify(valueOperations).set(
-                cacheKey,
-                expected,
-                ContributorCacheKey.TTL_MINUTES,
-                TimeUnit.MINUTES
-        );
-
-    }
-
-    @Test
-    void shouldStoreContributorsWithCorrectTtl(){
-
-        setupRedisCache();
-
-        String owner = "spring-projects";
-        String repo = "spring-boot";
-
-        GitHubContributorResponse contributor = new GitHubContributorResponse();
-        GitHubContributorResponse[] expected = {contributor};
-
-        String cacheKey = ContributorCacheKey.create(owner, repo);
-
-        when(gitHubClient.getContributors(owner, repo)).thenReturn(expected);
-
-        repositoryService.getContributors(owner, repo);
-
-        verify(valueOperations).set(
-                cacheKey,
-                expected,
-                ContributorCacheKey.TTL_MINUTES,
-                TimeUnit.MINUTES
+                eq(cacheKey),
+                anyString(),
+                eq(Duration.ofMinutes(ContributorCacheKey.TTL_MINUTES))
         );
 
     }
@@ -325,9 +316,8 @@ class RepositoryServiceTest {
 
         verify(valueOperations).set(
                 eq(RepositoryCacheKey.create(owner, repo)),
-                eq(response),
-                eq(RepositoryCacheKey.TTL_MINUTES),
-                eq(TimeUnit.MINUTES)
+                anyString(),
+                eq(Duration.ofMinutes(RepositoryCacheKey.TTL_MINUTES))
         );
 
 
@@ -387,15 +377,13 @@ class RepositoryServiceTest {
         String owner="spring-projects";
         String repo="spring-boot";
 
-        GitHubRepositoryResponse cachedRepository = new GitHubRepositoryResponse();
-
-        cachedRepository.setName(repo);
-        cachedRepository.setStars(200);
-        cachedRepository.setForks(50);
-
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-        when(valueOperations.get(RepositoryCacheKey.create(owner, repo))).thenReturn(cachedRepository);
+        String cachedJson =
+                "{\"name\":\"spring-boot\",\"stars\":200,\"forks\":50}";
+
+        when(valueOperations.get(RepositoryCacheKey.create(owner, repo)))
+                .thenReturn(cachedJson);
 
         RepositoryAnalyticsResponse actual = repositoryService.getRepositoryAnalytics(owner, repo);
 
@@ -436,10 +424,9 @@ class RepositoryServiceTest {
         verify(gitHubClient).getRepository(owner, repo);
 
         verify(valueOperations).set(
-                RepositoryCacheKey.create(owner, repo),
-                repositoryResponse,
-                RepositoryCacheKey.TTL_MINUTES,
-                TimeUnit.MINUTES
+                eq(RepositoryCacheKey.create(owner, repo)),
+                anyString(),
+                eq(Duration.ofMinutes(RepositoryCacheKey.TTL_MINUTES))
         );
 
     }
@@ -447,15 +434,19 @@ class RepositoryServiceTest {
     @Test
     void shouldReturnCacheStats() {
 
+
         // Generate one cache hit
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         GitHubRepositoryResponse cachedRepository =
                 new GitHubRepositoryResponse();
 
+        String cachedJson =
+                "{\"name\":\"spring-boot\",\"stars\":200,\"forks\":50}";
+
         when(valueOperations.get(
                 RepositoryCacheKey.create("spring-projects", "spring-boot")
-        )).thenReturn(cachedRepository);
+        )).thenReturn(cachedJson);
 
         repositoryService.getRepoDetails(
                 "spring-projects",
@@ -509,9 +500,12 @@ class RepositoryServiceTest {
         repositoryService.getContributors(owner, repo);
 
         // Cache hit
+        String cachedJson =
+                "[{\"login\":\"test-user\",\"avatar_url\":\"avatar.png\",\"contributions\":10,\"html_url\":\"github.com/test-user\"}]";
+
         when(valueOperations.get(
                 ContributorCacheKey.create(owner, repo)
-        )).thenReturn(contributors);
+        )).thenReturn(cachedJson);
 
         repositoryService.getContributors(owner, repo);
 
@@ -529,6 +523,157 @@ class RepositoryServiceTest {
 
         assertEquals(0, stats.getHits());
         assertEquals(0, stats.getMisses());
+    }
+
+    @Test
+    void shouldStoreRepositoryAsJsonInCache() {
+
+        setupRedisCache();
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubRepositoryResponse response =
+                new GitHubRepositoryResponse();
+
+        response.setName(repo);
+        response.setStars(100);
+        response.setForks(25);
+
+        when(gitHubClient.getRepository(owner, repo))
+                .thenReturn(response);
+
+        repositoryService.getRepoDetails(owner, repo);
+
+        verify(valueOperations).set(
+                eq(RepositoryCacheKey.create(owner, repo)),
+                anyString(),
+                eq(Duration.ofMinutes(RepositoryCacheKey.TTL_MINUTES))
+        );
+    }
+
+    @Test
+    void shouldStoreContributorsAsJsonInCache() {
+
+        setupRedisCache();
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubContributorResponse contributor =
+                new GitHubContributorResponse();
+
+        contributor.setLogin("test-user");
+        contributor.setContributions(10);
+
+        GitHubContributorResponse[] contributors =
+                {contributor};
+
+        when(gitHubClient.getContributors(owner, repo))
+                .thenReturn(contributors);
+
+        repositoryService.getContributors(owner, repo);
+
+        verify(valueOperations).set(
+                eq(ContributorCacheKey.create(owner, repo)),
+                anyString(),
+                eq(Duration.ofMinutes(ContributorCacheKey.TTL_MINUTES))
+        );
+    }
+
+    @Test
+    void shouldFetchFromGitHubWhenCachedRepositoryJsonIsInvalid() {
+
+        setupRedisCache();
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubRepositoryResponse expected =
+                new GitHubRepositoryResponse();
+
+        when(valueOperations.get(
+                RepositoryCacheKey.create(owner, repo)
+        )).thenReturn("not-valid-json");
+
+        when(gitHubClient.getRepository(owner, repo))
+                .thenReturn(expected);
+
+        GitHubRepositoryResponse result =
+                repositoryService.getRepoDetails(owner, repo);
+
+        assertSame(expected, result);
+
+        verify(gitHubClient).getRepository(owner, repo);
+
+        verify(redisTemplate).delete(
+                RepositoryCacheKey.create(owner, repo)
+        );
+    }
+
+    @Test
+    void shouldCountInvalidCachedJsonAsCacheMiss() {
+
+        setupRedisCache();
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        GitHubRepositoryResponse expected =
+                new GitHubRepositoryResponse();
+
+        when(valueOperations.get(
+                RepositoryCacheKey.create(owner, repo)
+        )).thenReturn("not-valid-json");
+
+        when(gitHubClient.getRepository(owner, repo))
+                .thenReturn(expected);
+
+        repositoryService.getRepoDetails(owner, repo);
+
+        assertEquals(0, repositoryService.getCacheHits());
+        assertEquals(1, repositoryService.getCacheMisses());
+    }
+
+    @Test
+    void shouldFetchContributorsWhenCachedJsonIsInvalid() {
+
+        setupRedisCache();
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        String cacheKey = ContributorCacheKey.create(owner, repo);
+
+        when(valueOperations.get(cacheKey))
+                .thenReturn("invalid-json");
+
+        GitHubContributorResponse contributor =
+                new GitHubContributorResponse();
+
+        contributor.setLogin("test-user");
+        contributor.setContributions(10);
+
+        GitHubContributorResponse[] expected =
+                new GitHubContributorResponse[]{contributor};
+
+        when(gitHubClient.getContributors(owner, repo))
+                .thenReturn(expected);
+
+        GitHubContributorResponse[] result =
+                repositoryService.getContributors(owner, repo);
+
+        assertSame(expected, result);
+
+        verify(redisTemplate).delete(cacheKey);
+
+        verify(gitHubClient).getContributors(owner, repo);
+
+        verify(valueOperations).set(
+                eq(cacheKey),
+                anyString(),
+                eq(Duration.ofMinutes(ContributorCacheKey.TTL_MINUTES))
+        );
     }
 
 

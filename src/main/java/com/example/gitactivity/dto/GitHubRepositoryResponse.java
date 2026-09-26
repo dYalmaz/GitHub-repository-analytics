@@ -1,12 +1,18 @@
 package com.example.gitactivity.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 public class GitHubRepositoryResponse {
 
     private String name;
     private String description;
+
+    @JsonAlias("stargazers_count")
     private int stars;
+
+    @JsonAlias("forks_count")
     private int forks;
+
     private String language;
 
     // Getters and setters

@@ -5,47 +5,65 @@ import com.example.gitactivity.dto.CacheStatsResponse;
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
 import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
+
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class RepositoryService {
 
     private final GitHubClient gitClient;
-    private final RedisTemplate<String, Object> redisTemplate;
-    private AtomicLong cacheHits = new AtomicLong(0);
-    private AtomicLong cacheMisses = new AtomicLong(0);
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final AtomicLong cacheHits = new AtomicLong();
+    private final AtomicLong cacheMisses = new AtomicLong();
 
 
-    public RepositoryService(GitHubClient gitClient, RedisTemplate<String, Object> redisTemplate) {
+    public RepositoryService(GitHubClient gitClient, StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
         this.gitClient = gitClient;
         this.redisTemplate = redisTemplate;
-
+        this.objectMapper = objectMapper;
     }
 
     public GitHubRepositoryResponse getRepoDetails(String owner, String repo) {
 
         String cacheKey = RepositoryCacheKey.create(owner, repo);
 
-        Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
+        String cachedJson =
+                redisTemplate.opsForValue().get(cacheKey);
 
-        if (cachedValue != null) {
-            cacheHits.incrementAndGet();
-            return (GitHubRepositoryResponse) cachedValue;
+        if (cachedJson != null) {
+            try {
+                GitHubRepositoryResponse cachedRepository =
+                        objectMapper.readValue(
+                                cachedJson,
+                                GitHubRepositoryResponse.class
+                        );
+
+                cacheHits.incrementAndGet();
+
+                return cachedRepository;
+
+            } catch (Exception e) {
+                redisTemplate.delete(cacheKey);
+            }
         }
 
         cacheMisses.incrementAndGet();
 
         GitHubRepositoryResponse repositoryResponse = gitClient.getRepository(owner, repo);
 
+        String json =
+                objectMapper.writeValueAsString(repositoryResponse);
+
         redisTemplate.opsForValue().set(
                 cacheKey,
-                repositoryResponse,
-                RepositoryCacheKey.TTL_MINUTES,
-                TimeUnit.MINUTES
+                json,
+                Duration.ofMinutes(RepositoryCacheKey.TTL_MINUTES)
         );
 
         return repositoryResponse;
@@ -55,22 +73,37 @@ public class RepositoryService {
 
         String cacheKey = ContributorCacheKey.create(owner, repo);
 
-        GitHubContributorResponse[] cached = (GitHubContributorResponse[]) redisTemplate.opsForValue().get(cacheKey);
+        String cached =
+                redisTemplate.opsForValue().get(cacheKey);
 
         if (cached != null) {
-            cacheHits.incrementAndGet();
-            return cached;
+            try {
+                GitHubContributorResponse[] cachedContributors =
+                        objectMapper.readValue(
+                                cached,
+                                GitHubContributorResponse[].class
+                        );
+
+                cacheHits.incrementAndGet();
+
+                return cachedContributors;
+
+            } catch (Exception e) {
+                redisTemplate.delete(cacheKey);
+            }
         }
 
         cacheMisses.incrementAndGet();
 
         GitHubContributorResponse[] response = gitClient.getContributors(owner, repo);
 
+        String json =
+                objectMapper.writeValueAsString(response);
+
         redisTemplate.opsForValue().set(
                 cacheKey,
-                response,
-                ContributorCacheKey.TTL_MINUTES,
-                TimeUnit.MINUTES
+                json,
+                Duration.ofMinutes(ContributorCacheKey.TTL_MINUTES)
         );
 
         return response;
@@ -100,6 +133,14 @@ public class RepositoryService {
         cacheStats.setMisses(cacheMisses.get());
 
         return cacheStats;
+    }
+
+    public long getCacheHits() {
+        return cacheHits.get();
+    }
+
+    public long getCacheMisses() {
+        return cacheMisses.get();
     }
 
 

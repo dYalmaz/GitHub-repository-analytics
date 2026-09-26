@@ -64,6 +64,36 @@ public class GitHubClient {
         return restClient.get()
                 .uri("/repos/{owner}/{repo}/contributors", owner, repo)
                 .retrieve()
+                .onStatus(
+                        status -> status.value() == 404,
+                        (request, response) -> {
+                            throw new RepositoryNotFoundException(
+                                    "Repository not found: " + owner + "/" + repo
+                            );
+                        }
+                )
+                .onStatus(
+                        status -> status.value() == 403,
+                        (request, response) -> {
+
+                            String remaining =
+                                    response.getHeaders().getFirst("X-RateLimit-Remaining");
+
+                            if ("0".equals(remaining)) {
+                                throw new GitHubRateLimitException(
+                                        "GitHub rate limit exceeded"
+                                );
+                            }
+                        }
+                )
+                .onStatus(
+                        status -> status.is5xxServerError(),
+                        (request, response) -> {
+                            throw new GitHubServiceException(
+                                    "GitHub service is currently unavailable"
+                            );
+                        }
+                )
                 .body(GitHubContributorResponse[].class);
     }
 
