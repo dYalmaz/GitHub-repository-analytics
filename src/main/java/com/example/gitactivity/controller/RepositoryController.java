@@ -2,6 +2,7 @@ package com.example.gitactivity.controller;
 
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
+import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
 import com.example.gitactivity.service.RepositoryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +33,12 @@ public class RepositoryController {
 
         return ResponseEntity.ok(contributors);
 
+    }
+
+    @GetMapping("/{owner}/{repo}/analytics")
+    public ResponseEntity<RepositoryAnalyticsResponse> getRepositoryAnalytics(@PathVariable String owner, @PathVariable String repo){
+        RepositoryAnalyticsResponse analytics = repositoryService.getRepositoryAnalytics(owner, repo);
+        return ResponseEntity.ok(analytics);
     }
 
 }

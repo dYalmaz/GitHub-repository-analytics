@@ -3,6 +3,7 @@ package com.example.gitactivity.service;
 import com.example.gitactivity.client.GitHubClient;
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
+import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
 import com.example.gitactivity.exception.GitHubRateLimitException;
 import com.example.gitactivity.exception.GitHubServiceException;
 import com.example.gitactivity.exception.RepositoryNotFoundException;
@@ -17,8 +18,7 @@ import org.springframework.data.redis.core.ValueOperations;
 
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -296,6 +296,115 @@ class RepositoryServiceTest {
 
     }
 
+    @Test
+    void shouldCalculateRepositoryAnalytics(){
+
+        String owner="spring-projects";
+        String repo="spring-boot";
+
+        GitHubRepositoryResponse repositoryResponse = new GitHubRepositoryResponse();
+
+        repositoryResponse.setName(repo);
+        repositoryResponse.setStars(100);
+        repositoryResponse.setForks(25);
+
+        when(gitHubClient.getRepository(owner, repo)).thenReturn(repositoryResponse);
+
+        setupRedisCache();
+
+        RepositoryAnalyticsResponse actual = repositoryService.getRepositoryAnalytics(owner, repo);
+
+        assertEquals("spring-boot", actual.getRepository());
+        assertEquals(100, actual.getStars());
+        assertEquals(25, actual.getForks());
+        assertEquals(0.25, actual.getForkToStarRatio());
+
+    }
+
+    @Test
+    void shouldReturnZeroForkToStarRatioWhenStarsAreZero(){
+
+        String owner="spring-projects";
+        String repo="spring-boot";
+
+        GitHubRepositoryResponse repositoryResponse = new GitHubRepositoryResponse();
+
+        repositoryResponse.setName(repo);
+        repositoryResponse.setStars(0);
+        repositoryResponse.setForks(25);
+
+        when(gitHubClient.getRepository(owner, repo)).thenReturn(repositoryResponse);
+
+        setupRedisCache();
+
+        RepositoryAnalyticsResponse actual = repositoryService.getRepositoryAnalytics(owner, repo);
+
+        assertEquals(0.0, actual.getForkToStarRatio());
+
+    }
+
+    @Test
+    void shouldCalculateAnalyticsFromCachedRepository(){
+
+        String owner="spring-projects";
+        String repo="spring-boot";
+
+        GitHubRepositoryResponse cachedRepository = new GitHubRepositoryResponse();
+
+        cachedRepository.setName(repo);
+        cachedRepository.setStars(200);
+        cachedRepository.setForks(50);
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        when(valueOperations.get(RepositoryCacheKey.create(owner, repo))).thenReturn(cachedRepository);
+
+        RepositoryAnalyticsResponse actual = repositoryService.getRepositoryAnalytics(owner, repo);
+
+        assertEquals("spring-boot", actual.getRepository());
+        assertEquals(200, actual.getStars());
+        assertEquals(50, actual.getForks());
+        assertEquals(0.25, actual.getForkToStarRatio());
+
+        verify(valueOperations).get(RepositoryCacheKey.create(owner, repo));
+
+        verify(gitHubClient, never()).getRepository(owner, repo);
+
+    }
+
+    @Test
+    void shouldFetchRepositoryFromGitHubIfNotCachedWhenCalculatingAnalyticsOnCacheMiss(){
+
+        String owner="spring-projects";
+        String repo="spring-boot";
+
+        GitHubRepositoryResponse repositoryResponse = new GitHubRepositoryResponse();
+
+        repositoryResponse.setName(repo);
+        repositoryResponse.setStars(150);
+        repositoryResponse.setForks(30);
+
+        setupRedisCache();
+
+        when(gitHubClient.getRepository(owner, repo)).thenReturn(repositoryResponse);
+
+        RepositoryAnalyticsResponse actual = repositoryService.getRepositoryAnalytics(owner, repo);
+
+        assertEquals("spring-boot", actual.getRepository());
+        assertEquals(150, actual.getStars());
+        assertEquals(30, actual.getForks());
+        assertEquals(0.2, actual.getForkToStarRatio());
+
+        verify(gitHubClient).getRepository(owner, repo);
+
+        verify(valueOperations).set(
+                RepositoryCacheKey.create(owner, repo),
+                repositoryResponse,
+                RepositoryCacheKey.TTL_MINUTES,
+                TimeUnit.MINUTES
+        );
+
+    }
 
 }
 

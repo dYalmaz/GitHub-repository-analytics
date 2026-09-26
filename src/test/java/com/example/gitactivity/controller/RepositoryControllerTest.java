@@ -2,6 +2,7 @@ package com.example.gitactivity.controller;
 
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
+import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
 import com.example.gitactivity.exception.GitHubRateLimitException;
 import com.example.gitactivity.exception.GitHubServiceException;
 import com.example.gitactivity.exception.RepositoryNotFoundException;
@@ -11,8 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 public class RepositoryControllerTest {
@@ -97,5 +97,28 @@ public class RepositoryControllerTest {
 
     }
 
+    @Test
+    void shouldReturnRepositoryAnalytics() {
+
+        String owner = "spring-projects";
+        String repo = "spring-boot";
+
+        RepositoryAnalyticsResponse expected = new RepositoryAnalyticsResponse();
+
+        expected.setRepository(repo);
+        expected.setStars(100);
+        expected.setForks(50);
+        expected.setForkToStarRatio(0.5);
+
+        when(repositoryService.getRepositoryAnalytics(owner, repo)).thenReturn(expected);
+
+        ResponseEntity<RepositoryAnalyticsResponse> response = repositoryController.getRepositoryAnalytics(owner, repo);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertSame(expected, response.getBody());
+
+        verify(repositoryService).getRepositoryAnalytics(owner, repo);
+
+    }
 
 }

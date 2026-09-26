@@ -3,12 +3,11 @@ package com.example.gitactivity.service;
 import com.example.gitactivity.client.GitHubClient;
 import com.example.gitactivity.dto.GitHubContributorResponse;
 import com.example.gitactivity.dto.GitHubRepositoryResponse;
+import com.example.gitactivity.dto.RepositoryAnalyticsResponse;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
-
-import static java.lang.reflect.Array.set;
 
 @Service
 public class RepositoryService {
@@ -64,6 +63,23 @@ public class RepositoryService {
         );
 
         return response;
+    }
+
+    public RepositoryAnalyticsResponse getRepositoryAnalytics(String owner, String repo) {
+
+        GitHubRepositoryResponse repository = getRepoDetails(owner, repo);
+
+        RepositoryAnalyticsResponse analytics = new RepositoryAnalyticsResponse();
+
+        analytics.setRepository(repository.getName());
+        analytics.setForks(repository.getForks());
+        analytics.setStars(repository.getStars());
+
+        double forkToStarRatio = repository.getStars() == 0 ? 0 : (double) repository.getForks() / repository.getStars();
+        analytics.setForkToStarRatio(forkToStarRatio);
+
+        return analytics;
+
     }
 
 
